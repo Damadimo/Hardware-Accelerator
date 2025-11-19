@@ -9,6 +9,8 @@ from tkinter import messagebox, ttk
 import numpy as np
 import serial
 import serial.tools.list_ports
+import os
+from datetime import datetime
 
 
 class DrawingApp:
@@ -335,21 +337,66 @@ class DrawingApp:
             fg='#4dabf7'
         )
     
+    def generate_mif_file(self, filename="pixel_data.mif"):
+        """Generate MIF file from current image data"""
+        try:
+            # Flatten the image data
+            flat_data = self.img.flatten()
+            
+            # Get the directory of the script
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            filepath = os.path.join(script_dir, filename)
+            
+            with open(filepath, 'w') as f:
+                # Write MIF header
+                f.write("-- Memory Initialization File for Pixel Data\n")
+                f.write(f"-- Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                f.write(f"-- Size: {len(flat_data)} pixels (28x28)\n")
+                f.write("\n")
+                f.write("DEPTH = 784;         -- Number of memory locations (28x28)\n")
+                f.write("WIDTH = 8;           -- 8-bit grayscale values\n")
+                f.write("ADDRESS_RADIX = DEC; -- Address in decimal\n")
+                f.write("DATA_RADIX = HEX;    -- Data in hexadecimal\n")
+                f.write("\n")
+                f.write("CONTENT\n")
+                f.write("BEGIN\n")
+                f.write("\n")
+                
+                # Write pixel data
+                for i, pixel in enumerate(flat_data):
+                    f.write(f"  {i:3d} : {pixel:02X};\n")
+                
+                f.write("\n")
+                f.write("END;\n")
+            
+            print(f"MIF file generated: {filepath}")
+            return filepath
+            
+        except Exception as e:
+            print(f"Error generating MIF file: {str(e)}")
+            return None
+    
     def classify(self):
-        """Send image data to FPGA for classification"""
-        # Check if serial port is open
-        if not self.ser or not self.ser.is_open:
-            messagebox.showwarning(
-                "Not Connected",
-                "Please connect to a serial port first"
-            )
-            return
-        
+        """Send image data to FPGA for classification and generate MIF file"""
         # Check if canvas is empty
         if np.sum(self.img) == 0:
             messagebox.showwarning(
                 "Empty Canvas",
                 "Please draw a digit first"
+            )
+            return
+        
+        # Generate MIF file
+        mif_file = self.generate_mif_file("pixel_data.mif")
+        if mif_file:
+            print(f"✓ MIF file generated: {mif_file}")
+        
+        # Check if serial port is open for sending
+        if not self.ser or not self.ser.is_open:
+            self.result_label.config(text="MIF file generated successfully", fg='#27ae60')
+            messagebox.showinfo(
+                "MIF File Generated",
+                f"MIF file saved to:\n{mif_file}\n\nNote: Not connected to serial port.\nConnect to send data to FPGA."
             )
             return
         
@@ -381,14 +428,22 @@ class DrawingApp:
                     text=f"Prediction: {predicted_digit}",
                     fg='#27ae60'
                 )
+                messagebox.showinfo(
+                    "Classification Complete",
+                    f"FPGA Prediction: {predicted_digit}\nMIF file: {mif_file}"
+                )
             else:
                 self.result_label.config(
                     text="No response from FPGA (timeout)",
                     fg='#e67e22'
                 )
+                messagebox.showwarning(
+                    "Timeout",
+                    f"No response from FPGA\nMIF file saved: {mif_file}"
+                )
                 
         except Exception as e:
-            messagebox.showerror("Communication Error", f"Error during classification:\n{str(e)}")
+            messagebox.showerror("Communication Error", f"Error during classification:\n{str(e)}\n\nMIF file saved: {mif_file}")
             self.result_label.config(text="Classification error", fg='#e74c3c')
     
     def on_closing(self):
