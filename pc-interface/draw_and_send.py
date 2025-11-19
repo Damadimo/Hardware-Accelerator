@@ -337,7 +337,7 @@ class DrawingApp:
             fg='#4dabf7'
         )
     
-    def generate_mif_file(self, filename="pixel_data.mif"):
+    def generate_mif_file(self, filename="image.mif"):
         """Generate MIF file from current image data"""
         try:
             # Flatten the image data
@@ -387,7 +387,7 @@ class DrawingApp:
             return
         
         # Generate MIF file
-        mif_file = self.generate_mif_file("pixel_data.mif")
+        mif_file = self.generate_mif_file("image.mif")
         if mif_file:
             print(f"✓ MIF file generated: {mif_file}")
         
